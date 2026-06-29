@@ -207,10 +207,7 @@ static int cp_recursive_up(const char *local_dir, const char *s3_dst,
     return errors;
 }
 
-/* ─────────────────────────────────────────────
-   RECURSIVE CP  s3://bucket/prefix → local-dir
-   Fetches key list from server, downloads each one.
-   ───────────────────────────────────────────── */
+
 static int cp_recursive_down(const char *bucket, const char *prefix,
                               const char *local_dst) {
     char *listing = fetch_key_list(bucket, prefix);
@@ -235,10 +232,7 @@ static int cp_recursive_down(const char *bucket, const char *prefix,
     return errors;
 }
 
-/* ─────────────────────────────────────────────
-   SYNC  local-dir → s3://bucket/prefix
 
-   ───────────────────────────────────────────── */
 
 /* Helper: collect all local files into a flat list */
 typedef struct { char rel_path[MAX_KEY_LEN]; uint64_t size; } LocalFile;
@@ -288,8 +282,7 @@ static int do_sync(const char *local_dir, const char *bucket,
     /* 1. Get all S3 keys under prefix */
     char *listing = fetch_key_list(bucket, prefix);
 
-    /* Parse listing into a simple key→size map */
-    /* Format per line: "key\tsize\n" */
+
     typedef struct { char key[MAX_KEY_LEN]; uint64_t size; } S3Entry;
     S3Entry *s3_entries = calloc(MAX_ENTRIES, sizeof(S3Entry));
     int s3_count = 0;
@@ -390,9 +383,6 @@ static int do_sync(const char *local_dir, const char *bucket,
     return 0;
 }
 
-/* ─────────────────────────────────────────────
-   PARSE s3://bucket/key  →  bucket + key
-   ───────────────────────────────────────────── */
 static void parse_s3(const char *s3path,
                      char *bucket, size_t blen,
                      char *key,    size_t klen) {
@@ -410,9 +400,6 @@ static void parse_s3(const char *s3path,
     }
 }
 
-/* ─────────────────────────────────────────────
-   USAGE
-   ───────────────────────────────────────────── */
 static void print_usage(void) {
     printf("Usage:\n");
     printf("  aws-s3 ls [s3://bucket/prefix]\n");
@@ -425,9 +412,7 @@ static void print_usage(void) {
     printf("  aws-s3 sync s3://bucket[/prefix] <local-dir>\n");
 }
 
-/* ─────────────────────────────────────────────
-   MAIN
-   ───────────────────────────────────────────── */
+
 int main(int argc, char *argv[]) {
     if (argc < 2) { print_usage(); return 1; }
 
@@ -525,7 +510,7 @@ int main(int argc, char *argv[]) {
             /* Upload directory then delete local files */
             if (cp_recursive_up(src, dst, "") == 0) {
                 /* Remove local dir after successful upload */
-                /* (simple: user can rm -rf; out of scope for this project) */
+
                 printf("mv: local directory uploaded. Remove local dir manually.\n");
             }
         } else if (recursive && src_is_s3 && !dst_is_s3) {

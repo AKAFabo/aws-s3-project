@@ -211,7 +211,8 @@ int bucket_put(const char *bucket_name, const char *key,
     char *path = bucket_filepath(bucket_name);
     if (!path) return -1;
 
-    /* ── Check if key already exists ── */
+    /* ── Check if key already e
+    typedef struct { char key[MAX_KEY_LExists ── */
     for (int i = 0; i < block.entry_count; i++) {
         DirEntry *e = &block.entries[i];
         if (!e->is_free && strcmp(e->key, key) == 0) {
