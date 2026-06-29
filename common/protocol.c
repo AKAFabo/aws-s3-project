@@ -29,6 +29,7 @@ int send_all(int fd, const void *buf, size_t len) {
 /*
  * recv_all — keep reading until every byte is received.
  *
+ * Why this exists:
  *   recv() may return partial data. We loop until we have
  *   exactly `len` bytes — critical for binary file transfers.
  *

@@ -20,7 +20,8 @@ static void handle_rb  (int client_fd, RequestHeader *req);
 static void handle_cp  (int client_fd, RequestHeader *req);
 static void handle_mv  (int client_fd, RequestHeader *req);
 static void handle_rm  (int client_fd, RequestHeader *req);
-static void handle_sync(int client_fd, RequestHeader *req);
+static void handle_sync     (int client_fd, RequestHeader *req);
+static void handle_list_keys(int client_fd, RequestHeader *req);
 
 /* ─────────────────────────────────────────────
    SEND A SIMPLE TEXT RESPONSE  (no file payload)
@@ -200,13 +201,14 @@ static void handle_mv(int client_fd, RequestHeader *req) {
     /* Reuse cp logic */
     handle_cp(client_fd, req);
 
-
+    /* If cp succeeded, delete the source */
+    /* (We check by peeking at the response — for simplicity we always try) */
     if (strncmp(req->src, "s3://", 5) == 0) {
         char bucket[256] = {0}, key[MAX_KEY_LEN] = {0};
         parse_s3_path(req->src, bucket, sizeof(bucket), key, sizeof(key));
         bucket_rm(bucket, key);
     }
-
+    /* Note: if source was local, the client handles deleting the local file */
 }
 
 /* rm: delete one or more objects */
@@ -245,10 +247,66 @@ static void handle_rm(int client_fd, RequestHeader *req) {
     }
 }
 
-/* sync: TODO — will be implemented in Phase 5 */
+/* sync: handled entirely on the client side via multiple cp calls.
+   The server just needs CMD_LIST_KEYS (below) to support it. */
 static void handle_sync(int client_fd, RequestHeader *req) {
     (void)req;
-    send_response(client_fd, 1, "sync: not yet implemented");
+    send_response(client_fd, 1, "sync: use client-side sync (this cmd is client-driven)");
+}
+
+/*
+ * list_keys: returns a machine-readable newline-separated list of
+ * "key\tsize\n" for every active object under the given prefix.
+ * Used internally by the client for recursive cp, mv, and sync.
+ */
+static void handle_list_keys(int client_fd, RequestHeader *req) {
+    char bucket[256] = {0}, prefix[MAX_KEY_LEN] = {0};
+    parse_s3_path(req->src, bucket, sizeof(bucket), prefix, sizeof(prefix));
+
+    ResponseHeader resp;
+    memset(&resp, 0, sizeof(resp));
+
+    if (!bucket_exists(bucket)) {
+        resp.status = 1;
+        snprintf(resp.message, sizeof(resp.message),
+                 "Error: bucket '%s' not found", bucket);
+        send_all(client_fd, &resp, sizeof(resp));
+        return;
+    }
+
+    DirBlock block;
+    if (bucket_read_dirblock(bucket, &block) != 0) {
+        resp.status = 1;
+        snprintf(resp.message, sizeof(resp.message), "Error: could not read bucket");
+        send_all(client_fd, &resp, sizeof(resp));
+        return;
+    }
+
+    /* Build "key\tsize\n" listing */
+    char *listing = calloc(1, MAX_ENTRIES * (MAX_KEY_LEN + 32));
+    if (!listing) {
+        send_response(client_fd, 1, "Error: out of memory");
+        return;
+    }
+    size_t pos = 0;
+    for (int i = 0; i < block.entry_count; i++) {
+        DirEntry *e = &block.entries[i];
+        if (e->is_free) continue;
+        if (prefix[0] && strncmp(e->key, prefix, strlen(prefix)) != 0) continue;
+        int written = snprintf(listing + pos,
+                               MAX_KEY_LEN + 32,
+                               "%s\t%llu\n",
+                               e->key,
+                               (unsigned long long)e->size);
+        if (written > 0) pos += (size_t)written;
+    }
+
+    resp.status   = 0;
+    resp.data_len = pos;
+    snprintf(resp.message, sizeof(resp.message), "OK");
+    send_all(client_fd, &resp, sizeof(resp));
+    if (pos > 0) send_all(client_fd, listing, pos);
+    free(listing);
 }
 
 /* ─────────────────────────────────────────────
@@ -273,8 +331,9 @@ static void handle_client(int client_fd) {
         case CMD_RB:   handle_rb  (client_fd, &req); break;
         case CMD_CP:   handle_cp  (client_fd, &req); break;
         case CMD_MV:   handle_mv  (client_fd, &req); break;
-        case CMD_RM:   handle_rm  (client_fd, &req); break;
-        case CMD_SYNC: handle_sync(client_fd, &req); break;
+        case CMD_RM:        handle_rm        (client_fd, &req); break;
+        case CMD_SYNC:      handle_sync      (client_fd, &req); break;
+        case CMD_LIST_KEYS: handle_list_keys (client_fd, &req); break;
         default:
             send_response(client_fd, 1, "Error: unknown command");
     }

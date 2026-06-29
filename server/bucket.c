@@ -174,7 +174,7 @@ void bucket_list_all(int client_fd) {
 }
 
 /* ─────────────────────────────────────────────
-   bucket_list — prints objects inside a bucket 
+   bucket_list — prints objects inside a bucket (with optional prefix)
    ───────────────────────────────────────────── */
 void bucket_list(int client_fd, const char *bucket_name, const char *prefix) {
     ResponseHeader resp;

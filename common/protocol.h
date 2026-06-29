@@ -29,7 +29,8 @@ typedef enum {
     CMD_CP   = 4,   /* copy file                       */
     CMD_MV   = 5,   /* move file                       */
     CMD_RM   = 6,   /* remove object                   */
-    CMD_SYNC = 7    /* sync directory with bucket      */
+    CMD_SYNC      = 7,  /* sync directory with bucket                        */
+    CMD_LIST_KEYS = 8   /* machine-readable key+size list (for recursive ops) */
 } CommandType;
 
 /* ─────────────────────────────────────────────
