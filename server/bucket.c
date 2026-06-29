@@ -211,7 +211,10 @@ void bucket_list(int client_fd, const char *bucket_name, const char *prefix) {
 
     resp.status   = 0;
     resp.data_len = strlen(listing);
-    snprintf(resp.message, sizeof(resp.message), "OK");
+    if (resp.data_len == 0)
+        snprintf(resp.message, sizeof(resp.message), "(no objects found)");
+    else
+        snprintf(resp.message, sizeof(resp.message), "OK");
     send_all(client_fd, &resp, sizeof(resp));
     if (resp.data_len > 0)
         send_all(client_fd, listing, resp.data_len);

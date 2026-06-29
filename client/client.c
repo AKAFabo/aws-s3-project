@@ -247,15 +247,44 @@ static int cp_recursive_down(const char *bucket, const char *prefix,
         return 0;
     }
 
+    size_t prefix_len = (prefix && prefix[0]) ? strlen(prefix) : 0;
+
     int errors = 0;
     char *line = strtok(listing, "\n");
     while (line) {
-        /* Each line: "key\tsize" */
         char *tab = strchr(line, '\t');
-        if (tab) *tab = '\0';   /* key is now just line */
+        if (tab) *tab = '\0';
         if (line[0]) {
-            printf("download: s3://%s/%s → %s/%s\n", bucket, line, local_dst, line);
-            if (download_one(bucket, line, local_dst) != 0) errors++;
+            /* Strip prefix so local path mirrors the relative structure */
+            const char *rel = line;
+            if (prefix_len > 0 && strncmp(rel, prefix, prefix_len) == 0) {
+                rel += prefix_len;
+                if (*rel == '/') rel++;   /* skip leading slash */
+            }
+            printf("download: s3://%s/%s → %s/%s\n", bucket, line, local_dst, rel);
+            /* Build local path using the stripped relative key */
+            char local_path[1024];
+            snprintf(local_path, sizeof(local_path), "%s/%s", local_dst, rel);
+            /* Create parent directories */
+            char tmp[1024];
+            strncpy(tmp, local_path, sizeof(tmp) - 1);
+            for (char *p = tmp + 1; *p; p++) {
+                if (*p == '/') { *p = '\0'; mkdir(tmp, 0755); *p = '/'; }
+            }
+            /* Build full S3 source path and download */
+            char s3_src[MAX_KEY_LEN];
+            snprintf(s3_src, sizeof(s3_src), "s3://%s/%s", bucket, line);
+            RequestHeader req;
+            memset(&req, 0, sizeof(req));
+            req.cmd = CMD_CP;
+            strncpy(req.src, s3_src,     MAX_KEY_LEN - 1);
+            strncpy(req.dst, local_path, MAX_KEY_LEN - 1);
+            int fd = connect_to_server();
+            if (fd >= 0) {
+                send_all(fd, &req, sizeof(req));
+                receive_response(fd, local_path);
+                close(fd);
+            } else errors++;
         }
         line = strtok(NULL, "\n");
     }
@@ -488,8 +517,9 @@ int main(int argc, char *argv[]) {
         strncpy(req.src, argv[2], MAX_KEY_LEN-1);
         int fd = connect_to_server(); if (fd < 0) return 1;
         send_all(fd, &req, sizeof(req));
-        receive_response(fd, NULL);
+        int ret = receive_response(fd, NULL);
         close(fd);
+        return ret;
 
     /* ── rb ── */
     } else if (strcmp(subcmd, "rb") == 0) {

@@ -91,7 +91,7 @@ static void handle_mb(int client_fd, RequestHeader *req) {
         snprintf(msg, sizeof(msg), "make_bucket: s3://%s", bucket);
         send_response(client_fd, 0, msg);
     } else {
-        send_response(client_fd, 1, "Error: could not create bucket (already exists?)");
+        send_response(client_fd, 1, "Error: bucket already exists");
     }
 }
 
