@@ -1,12 +1,3 @@
-# ─────────────────────────────────────────────
-#  Makefile for aws-s3 project
-#  Usage:
-#    make          → build both server and client
-#    make server   → build only the server
-#    make client   → build only the client
-#    make clean    → remove compiled files
-# ─────────────────────────────────────────────
-
 CC      = gcc
 CFLAGS  = -Wall -Wextra -g -std=c11 -D_FILE_OFFSET_BITS=64 -D_POSIX_C_SOURCE=200809L
 

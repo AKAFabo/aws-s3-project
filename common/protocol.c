@@ -7,10 +7,6 @@
 /*
  * send_all — keep sending until every byte is delivered.
  *
- * Why this exists:
- *   send() on a socket may return before sending all bytes
- *   (especially for large payloads). We loop until done.
- *
  * Returns 0 on success, -1 on error.
  */
 int send_all(int fd, const void *buf, size_t len) {
@@ -28,10 +24,6 @@ int send_all(int fd, const void *buf, size_t len) {
 
 /*
  * recv_all — keep reading until every byte is received.
- *
- * Why this exists:
- *   recv() may return partial data. We loop until we have
- *   exactly `len` bytes — critical for binary file transfers.
  *
  * Returns 0 on success, -1 on error or connection closed.
  */

@@ -9,10 +9,7 @@
 #include <dirent.h>
 #include <unistd.h>
 
-/* ─────────────────────────────────────────────
-   INTERNAL HELPER: build the file path for a bucket
-   e.g. "my-bucket"  →  "./buckets/my-bucket.bucket"
-   ───────────────────────────────────────────── */
+
 char *bucket_filepath(const char *bucket_name) {
     /* +16 for the directory prefix, extension, and null terminator */
     size_t len = strlen(BUCKET_DIR) + strlen(bucket_name) + 16;
@@ -22,9 +19,7 @@ char *bucket_filepath(const char *bucket_name) {
     return path;   /* caller must free() */
 }
 
-/* ─────────────────────────────────────────────
-   bucket_exists
-   ───────────────────────────────────────────── */
+
 int bucket_exists(const char *bucket_name) {
     char *path = bucket_filepath(bucket_name);
     if (!path) return 0;
@@ -34,10 +29,7 @@ int bucket_exists(const char *bucket_name) {
     return exists;
 }
 
-/* ─────────────────────────────────────────────
-   bucket_read_dirblock
-   Reads the DirBlock from byte 0 of the bucket file.
-   ───────────────────────────────────────────── */
+
 int bucket_read_dirblock(const char *bucket_name, DirBlock *block) {
     char *path = bucket_filepath(bucket_name);
     if (!path) return -1;
@@ -51,10 +43,7 @@ int bucket_read_dirblock(const char *bucket_name, DirBlock *block) {
     return (n == 1) ? 0 : -1;
 }
 
-/* ─────────────────────────────────────────────
-   bucket_write_dirblock
-   Overwrites the DirBlock at byte 0 without touching file data.
-   ───────────────────────────────────────────── */
+
 int bucket_write_dirblock(const char *bucket_name, const DirBlock *block) {
     char *path = bucket_filepath(bucket_name);
     if (!path) return -1;
@@ -70,9 +59,7 @@ int bucket_write_dirblock(const char *bucket_name, const DirBlock *block) {
     return (n == 1) ? 0 : -1;
 }
 
-/* ─────────────────────────────────────────────
-   bucket_create
-   ───────────────────────────────────────────── */
+
 int bucket_create(const char *bucket_name) {
     /* Make sure the buckets directory exists */
     mkdir(BUCKET_DIR, 0755);    /* ignore error if already exists */
@@ -97,9 +84,6 @@ int bucket_create(const char *bucket_name) {
     return 0;
 }
 
-/* ─────────────────────────────────────────────
-   bucket_delete
-   ───────────────────────────────────────────── */
 int bucket_delete(const char *bucket_name, int force) {
     if (!bucket_exists(bucket_name)) return -1;
 
@@ -127,9 +111,7 @@ int bucket_delete(const char *bucket_name, int force) {
     return ret;
 }
 
-/* ─────────────────────────────────────────────
-   bucket_list_all — prints all bucket names to client_fd
-   ───────────────────────────────────────────── */
+
 void bucket_list_all(int client_fd) {
     DIR *dir = opendir(BUCKET_DIR);
     if (!dir) {
@@ -173,9 +155,7 @@ void bucket_list_all(int client_fd) {
         send_all(client_fd, listing, resp.data_len);
 }
 
-/* ─────────────────────────────────────────────
-   bucket_list — prints objects inside a bucket (with optional prefix)
-   ───────────────────────────────────────────── */
+
 void bucket_list(int client_fd, const char *bucket_name, const char *prefix) {
     ResponseHeader resp;
     memset(&resp, 0, sizeof(resp));
@@ -220,9 +200,7 @@ void bucket_list(int client_fd, const char *bucket_name, const char *prefix) {
         send_all(client_fd, listing, resp.data_len);
 }
 
-/* ─────────────────────────────────────────────
-   bucket_put — store a file into a bucket
-   ───────────────────────────────────────────── */
+
 int bucket_put(const char *bucket_name, const char *key,
                const void *data, uint64_t size) {
     if (!bucket_exists(bucket_name)) return -1;
@@ -307,9 +285,7 @@ int bucket_put(const char *bucket_name, const char *key,
     return bucket_write_dirblock(bucket_name, &block);
 }
 
-/* ─────────────────────────────────────────────
-   bucket_get — retrieve a file from a bucket
-   ───────────────────────────────────────────── */
+
 void *bucket_get(const char *bucket_name, const char *key, uint64_t *out_size) {
     if (!bucket_exists(bucket_name)) return NULL;
 
@@ -340,9 +316,7 @@ void *bucket_get(const char *bucket_name, const char *key, uint64_t *out_size) {
     return NULL;   /* not found */
 }
 
-/* ─────────────────────────────────────────────
-   bucket_rm — delete one object from a bucket
-   ───────────────────────────────────────────── */
+
 int bucket_rm(const char *bucket_name, const char *key) {
     if (!bucket_exists(bucket_name)) return -1;
 

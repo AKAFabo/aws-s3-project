@@ -10,9 +10,7 @@
 
 #include "../common/protocol.h"
 
-/* ─────────────────────────────────────────────
-   CONNECT TO SERVER
-   ───────────────────────────────────────────── */
+
 static int connect_to_server(void) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) { perror("socket"); return -1; }
@@ -29,11 +27,7 @@ static int connect_to_server(void) {
     return fd;
 }
 
-/* ─────────────────────────────────────────────
-   RECEIVE AND PRINT SERVER RESPONSE
-   If save_path != NULL, write payload bytes to that file.
-   Returns resp.status (0=OK).
-   ───────────────────────────────────────────── */
+
 static int receive_response(int fd, const char *save_path) {
     ResponseHeader resp;
     if (recv_all(fd, &resp, sizeof(resp)) != 0) {
@@ -67,11 +61,7 @@ static int receive_response(int fd, const char *save_path) {
     return resp.status;
 }
 
-/* ─────────────────────────────────────────────
-   RECEIVE RESPONSE INTO A BUFFER (don't print)
-   Used internally by sync to get key listings.
-   Caller must free() *out_buf.
-   ───────────────────────────────────────────── */
+
 static int receive_response_buf(int fd, char **out_buf, uint64_t *out_len) {
     ResponseHeader resp;
     if (recv_all(fd, &resp, sizeof(resp)) != 0) return -1;
@@ -88,12 +78,7 @@ static int receive_response_buf(int fd, char **out_buf, uint64_t *out_len) {
     return 0;
 }
 
-/* ─────────────────────────────────────────────
-   UPLOAD ONE LOCAL FILE → S3
-   Opens a new connection per file (simple & reliable).
-   key_override: if set, use this as the S3 key instead
-                 of deriving it from the filename.
-   ───────────────────────────────────────────── */
+
 static int upload_one(const char *local_path, const char *s3_dst,
                       const char *key_override) {
     struct stat st;
@@ -132,10 +117,6 @@ static int upload_one(const char *local_path, const char *s3_dst,
     return ret;
 }
 
-/* ─────────────────────────────────────────────
-   DOWNLOAD ONE S3 KEY → LOCAL FILE
-   Creates intermediate directories as needed.
-   ───────────────────────────────────────────── */
 static int download_one(const char *s3_src_bucket, const char *key,
                         const char *local_dst_dir) {
     /* Build local path: dst_dir/key  (key may contain slashes) */
@@ -171,11 +152,7 @@ static int download_one(const char *s3_src_bucket, const char *key,
     return ret;
 }
 
-/* ─────────────────────────────────────────────
-   GET KEY LISTING FROM SERVER
-   Sends CMD_LIST_KEYS and returns a newline-separated
-   list of "key\tsize" pairs.  Caller must free().
-   ───────────────────────────────────────────── */
+
 static char *fetch_key_list(const char *bucket, const char *prefix) {
     RequestHeader req;
     memset(&req, 0, sizeof(req));
@@ -192,12 +169,7 @@ static char *fetch_key_list(const char *bucket, const char *prefix) {
     return buf;   /* may be NULL if bucket empty */
 }
 
-/* ─────────────────────────────────────────────
-   RECURSIVE CP  local-dir → s3://bucket/prefix
-   Walks local_dir recursively, uploading every file.
-   rel_prefix: the key prefix to prepend (the path
-               relative to the top-level src dir).
-   ───────────────────────────────────────────── */
+
 static int cp_recursive_up(const char *local_dir, const char *s3_dst,
                             const char *rel_prefix) {
     DIR *d = opendir(local_dir);
@@ -247,44 +219,15 @@ static int cp_recursive_down(const char *bucket, const char *prefix,
         return 0;
     }
 
-    size_t prefix_len = (prefix && prefix[0]) ? strlen(prefix) : 0;
-
     int errors = 0;
     char *line = strtok(listing, "\n");
     while (line) {
+        /* Each line: "key\tsize" */
         char *tab = strchr(line, '\t');
-        if (tab) *tab = '\0';
+        if (tab) *tab = '\0';   /* key is now just line */
         if (line[0]) {
-            /* Strip prefix so local path mirrors the relative structure */
-            const char *rel = line;
-            if (prefix_len > 0 && strncmp(rel, prefix, prefix_len) == 0) {
-                rel += prefix_len;
-                if (*rel == '/') rel++;   /* skip leading slash */
-            }
-            printf("download: s3://%s/%s → %s/%s\n", bucket, line, local_dst, rel);
-            /* Build local path using the stripped relative key */
-            char local_path[1024];
-            snprintf(local_path, sizeof(local_path), "%s/%s", local_dst, rel);
-            /* Create parent directories */
-            char tmp[1024];
-            strncpy(tmp, local_path, sizeof(tmp) - 1);
-            for (char *p = tmp + 1; *p; p++) {
-                if (*p == '/') { *p = '\0'; mkdir(tmp, 0755); *p = '/'; }
-            }
-            /* Build full S3 source path and download */
-            char s3_src[MAX_KEY_LEN];
-            snprintf(s3_src, sizeof(s3_src), "s3://%s/%s", bucket, line);
-            RequestHeader req;
-            memset(&req, 0, sizeof(req));
-            req.cmd = CMD_CP;
-            strncpy(req.src, s3_src,     MAX_KEY_LEN - 1);
-            strncpy(req.dst, local_path, MAX_KEY_LEN - 1);
-            int fd = connect_to_server();
-            if (fd >= 0) {
-                send_all(fd, &req, sizeof(req));
-                receive_response(fd, local_path);
-                close(fd);
-            } else errors++;
+            printf("download: s3://%s/%s → %s/%s\n", bucket, line, local_dst, line);
+            if (download_one(bucket, line, local_dst) != 0) errors++;
         }
         line = strtok(NULL, "\n");
     }
@@ -294,9 +237,7 @@ static int cp_recursive_down(const char *bucket, const char *prefix,
 
 /* ─────────────────────────────────────────────
    SYNC  local-dir → s3://bucket/prefix
-   Only uploads files that are new or size-changed.
-   With --delete: also removes S3 keys that don't
-   exist locally anymore.
+
    ───────────────────────────────────────────── */
 
 /* Helper: collect all local files into a flat list */
@@ -517,9 +458,8 @@ int main(int argc, char *argv[]) {
         strncpy(req.src, argv[2], MAX_KEY_LEN-1);
         int fd = connect_to_server(); if (fd < 0) return 1;
         send_all(fd, &req, sizeof(req));
-        int ret = receive_response(fd, NULL);
+        receive_response(fd, NULL);
         close(fd);
-        return ret;
 
     /* ── rb ── */
     } else if (strcmp(subcmd, "rb") == 0) {

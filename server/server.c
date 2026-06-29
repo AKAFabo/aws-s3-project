@@ -309,9 +309,7 @@ static void handle_list_keys(int client_fd, RequestHeader *req) {
     free(listing);
 }
 
-/* ─────────────────────────────────────────────
-   HANDLE ONE CLIENT CONNECTION
-   ───────────────────────────────────────────── */
+
 static void handle_client(int client_fd) {
     RequestHeader req;
 
@@ -339,9 +337,7 @@ static void handle_client(int client_fd) {
     }
 }
 
-/* ─────────────────────────────────────────────
-   MAIN — set up the listening socket
-   ───────────────────────────────────────────── */
+
 int main(void) {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) { perror("socket"); return 1; }

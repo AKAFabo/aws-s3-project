@@ -3,19 +3,7 @@
 
 #include "../common/protocol.h"
 
-/*
- * bucket.h — all functions that read/write bucket files.
- *
- * A bucket file has this layout on disk:
- *
- *   [ DirBlock (fixed size, always at byte 0)        ]
- *   [ file contents packed sequentially after that   ]
- *
- * The DirBlock lists every object stored in this bucket,
- * with the byte offset where that object's data starts.
- * Free slots (from deleted or replaced files) are also
- * tracked inside the DirBlock so space can be reused.
- */
+
 
 /* Create a new, empty bucket file. Returns 0 on success. */
 int  bucket_create(const char *bucket_name);
@@ -32,25 +20,10 @@ void bucket_list_all(int client_fd);
 /* List all objects inside a bucket, optionally under a prefix. */
 void bucket_list(int client_fd, const char *bucket_name, const char *prefix);
 
-/*
- * Store a file into a bucket.
- *   bucket_name : name of the target bucket
- *   key         : object key (the "path" inside the bucket)
- *   data        : pointer to file bytes
- *   size        : number of bytes
- * Returns 0 on success.
- */
+
 int  bucket_put(const char *bucket_name, const char *key,
                 const void *data, uint64_t size);
 
-/*
- * Retrieve a file from a bucket.
- *   bucket_name : name of the source bucket
- *   key         : object key to look up
- *   out_size    : set to the object's byte count on success
- * Returns a malloc'd buffer with the object data (caller must free),
- * or NULL if not found.
- */
 void *bucket_get(const char *bucket_name, const char *key,
                  uint64_t *out_size);
 
